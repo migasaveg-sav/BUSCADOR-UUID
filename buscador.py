@@ -1,14 +1,19 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Factura Finder", layout="wide")
+st.set_page_config(page_title="Buscador UUID", layout="wide")
 
-# --- Cargar Excel ---
-@st.cache_data
-def load_data():
-    return pd.read_excel("facturas.xlsx")   # Cambia el nombre del archivo
+st.title("🔎 Buscador de Facturas por UUID")
 
-df = load_data()
+# --- Subir archivo ---
+uploaded_file = st.file_uploader("Selecciona tu archivo Excel", type=["xlsx"])
+
+if uploaded_file is not None:
+    df = pd.read_excel(uploaded_file)
+else:
+    st.warning("Por favor selecciona un archivo Excel para continuar.")
+    st.stop()
+
 
 st.title("🔎 Buscador de Facturas por UUID")
 
