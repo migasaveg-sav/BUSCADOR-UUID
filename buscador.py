@@ -13,7 +13,6 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
 
-    # Detectar si es CSV o XLSX
     filename = uploaded_file.name.lower()
 
     if filename.endswith(".csv"):
@@ -21,8 +20,7 @@ if uploaded_file is not None:
     else:
         df = pd.read_excel(uploaded_file)
 
-    # Mostrar columnas detectadas
-    st.write("Columnas detectadas:")
+    st.write("### Columnas detectadas en el archivo:")
     st.write(list(df.columns))
 
 else:
