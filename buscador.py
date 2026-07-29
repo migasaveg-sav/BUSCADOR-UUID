@@ -34,8 +34,11 @@ else:
 if "lineas" not in st.session_state:
     st.session_state.lineas = []
 
-if "totales" not in st.session_state:
-    st.session_state.totales = {"subtotal": 0, "iva": 0, "total": 0}
+if "tabla" not in st.session_state:
+    st.session_state.tabla = pd.DataFrame(columns=[
+        "Emisión", "Subtotal", "Retención", "ISR", "IVA Retenido",
+        "Total Original XML", "Lugar Expedición", "Concepto"
+    ])
 
 # -------------------------------
 # BOTÓN SUPERIOR + TOTALES
@@ -43,36 +46,32 @@ if "totales" not in st.session_state:
 st.header("➕ Añadir nueva línea")
 
 def add_line():
-    st.session_state.lineas.append({"uuid": "", "deducible": False})
+    st.session_state.lineas.append({"uuid": ""})
 
 st.button("Añadir línea", on_click=add_line)
 
 # Mostrar totales acumulados
-st.subheader("📊 Totales acumulados")
-st.write(f"**Subtotal acumulado:** {st.session_state.totales['subtotal']:,.2f}")
-st.write(f"**IVA acumulado:** {st.session_state.totales['iva']:,.2f}")
-st.write(f"**Total acumulado:** {st.session_state.totales['total']:,.2f}")
+if not st.session_state.tabla.empty:
+    totales = st.session_state.tabla.sum(numeric_only=True)
+
+    st.subheader("📊 Totales acumulados (sin comas)")
+    st.write(f"**Subtotal acumulado:** {totales['Subtotal']:.2f}")
+    st.write(f"**Retención acumulada:** {totales['Retención']:.2f}")
+    st.write(f"**ISR acumulado:** {totales['ISR']:.2f}")
+    st.write(f"**IVA Retenido acumulado:** {totales['IVA Retenido']:.2f}")
+    st.write(f"**Total Original XML acumulado:** {totales['Total Original XML']:.2f}")
 
 st.markdown("---")
 
 # -------------------------------
-# LISTA DE FACTURAS (ABAJO)
+# PROCESAR CADA LÍNEA
 # -------------------------------
-st.header("📄 Facturas agregadas")
-
 for idx, linea in enumerate(st.session_state.lineas):
 
-    st.subheader(f"Factura #{idx + 1}")
+    st.subheader(f"Línea #{idx + 1}")
 
-    col1, col2 = st.columns([3, 1])
-
-    with col1:
-        uuid_val = st.text_input(f"UUID línea {idx+1}", key=f"uuid_{idx}", value=linea["uuid"])
-        linea["uuid"] = uuid_val
-
-    with col2:
-        deducible_btn = st.checkbox("Deducibilidad 8.5%", key=f"ded_{idx}")
-        linea["deducible"] = deducible_btn
+    uuid_val = st.text_input(f"UUID línea {idx+1}", key=f"uuid_{idx}", value=linea["uuid"])
+    linea["uuid"] = uuid_val
 
     if uuid_val:
 
@@ -88,39 +87,39 @@ for idx, linea in enumerate(st.session_state.lineas):
 
         factura = row.iloc[0]
 
-        # -------------------------------
-        # DESPLIEGUE DE CAMPOS
-        # -------------------------------
-        st.write("### Datos de la factura")
+        # Extraer columnas
+        emision = factura.get("Emisión", "")
+        subtotal = float(factura.get("SubTotal", 0))
+        isr = float(factura.get("ISR Retenido", 0))
+        iva_ret = float(factura.get("IVA Retenido", 0))
+        retencion = isr + iva_ret
+        total_xml = float(factura.get("Total Original XML", 0))
+        lugar_exp = factura.get("Emisor Lugar Expedición", "")
+        concepto = factura.get("Conceptos Descripción", "")
 
-        def mostrar(columna, nombre):
-            if columna in df.columns:
-                st.write(f"**{nombre}:** {factura[columna]}")
-            else:
-                st.write(f"**{nombre}:** (columna no encontrada)")
+        # Agregar a la tabla
+        nueva_fila = {
+            "Emisión": emision,
+            "Subtotal": subtotal,
+            "Retención": retencion,
+            "ISR": isr,
+            "IVA Retenido": iva_ret,
+            "Total Original XML": total_xml,
+            "Lugar Expedición": lugar_exp,
+            "Concepto": concepto
+        }
 
-        mostrar("Emisión", "Fecha")
-        mostrar("SubTotal", "Subtotal")
-        mostrar("IVA", "IVA")
-        mostrar("Total", "Total")
-        mostrar("Conceptos Descripción", "Concepto")
+        st.session_state.tabla = pd.concat(
+            [st.session_state.tabla, pd.DataFrame([nueva_fila])],
+            ignore_index=True
+        )
 
-        # -------------------------------
-        # ACTUALIZAR TOTALES
-        # -------------------------------
-        try:
-            st.session_state.totales["subtotal"] += float(factura["SubTotal"])
-            st.session_state.totales["iva"] += float(factura["IVA"])
-            st.session_state.totales["total"] += float(factura["Total"])
-        except:
-            st.warning("No se pudieron sumar los totales por formato incorrecto.")
+# -------------------------------
+# TABLA FINAL
+# -------------------------------
+st.header("📄 Facturas agregadas (tabla)")
 
-        # -------------------------------
-        # DEDUCIBILIDAD
-        # -------------------------------
-        if deducible_btn:
-            if "Total" in df.columns:
-                deducible = factura["Total"] * 0.085
-                st.success(f"Deducible (8.5%): {deducible:,.2f}")
-            else:
-                st.warning("No se encontró la columna 'Total' para calcular deducibilidad.")
+if st.session_state.tabla.empty:
+    st.info("Aún no hay facturas agregadas.")
+else:
+    st.dataframe(st.session_state.tabla.style.format("{:.2f}"))
