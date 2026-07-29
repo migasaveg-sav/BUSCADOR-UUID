@@ -6,12 +6,27 @@ st.set_page_config(page_title="Buscador UUID", layout="wide")
 st.title("🔎 Buscador de Facturas por UUID")
 
 # --- Subir archivo ---
-uploaded_file = st.file_uploader("Selecciona tu archivo Excel", type=["xlsx"])
+uploaded_file = st.file_uploader(
+    "Selecciona tu archivo Excel o CSV",
+    type=["xlsx", "csv"]
+)
 
 if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
+
+    # Detectar si es CSV o XLSX
+    filename = uploaded_file.name.lower()
+
+    if filename.endswith(".csv"):
+        df = pd.read_csv(uploaded_file, encoding="utf-8", sep=",")
+    else:
+        df = pd.read_excel(uploaded_file)
+
+    # Mostrar columnas detectadas
+    st.write("Columnas detectadas:")
+    st.write(list(df.columns))
+
 else:
-    st.warning("Por favor selecciona un archivo Excel para continuar.")
+    st.warning("Por favor selecciona un archivo para continuar.")
     st.stop()
 
 
