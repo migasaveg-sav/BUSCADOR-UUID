@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Buscador UUID", layout="wide")
-
 st.title("🔎 Buscador de Facturas por UUID")
 
-# --- Subir archivo ---
+# -------------------------------
+# CARGA DE ARCHIVO (XLSX o CSV)
+# -------------------------------
 uploaded_file = st.file_uploader(
     "Selecciona tu archivo Excel o CSV",
     type=["xlsx", "csv"]
@@ -15,10 +16,23 @@ if uploaded_file is not None:
 
     filename = uploaded_file.name.lower()
 
+    # Detectar tipo de archivo
     if filename.endswith(".csv"):
-        df = pd.read_csv(uploaded_file, encoding="utf-8", sep=",")
+        df_raw = pd.read_csv(uploaded_file, encoding="utf-8", sep=",")
     else:
-        df = pd.read_excel(uploaded_file)
+        df_raw = pd.read_excel(uploaded_file)
+
+    # Intentar detectar encabezado correcto
+    df = None
+    for h in range(5):
+        temp = pd.read_excel(uploaded_file, header=h) if filename.endswith(".xlsx") else pd.read_csv(uploaded_file, header=h)
+        if "UUID" in temp.columns:
+            df = temp
+            break
+
+    # Si no se encontró encabezado correcto
+    if df is None:
+        df = df_raw
 
     st.write("### Columnas detectadas en el archivo:")
     st.write(list(df.columns))
@@ -27,24 +41,22 @@ else:
     st.warning("Por favor selecciona un archivo para continuar.")
     st.stop()
 
-
-st.title("🔎 Buscador de Facturas por UUID")
-
-# --- Input del usuario ---
-uuid_input = st.text_input("Ingresa el UUID:")
-
-# --- Contenedor de líneas dinámicas ---
+# -------------------------------
+# LÍNEAS DINÁMICAS
+# -------------------------------
 if "lineas" not in st.session_state:
     st.session_state.lineas = []
 
-# --- Función para añadir línea ---
 def add_line():
     st.session_state.lineas.append({"uuid": "", "deducible": False})
 
 st.button("➕ Añadir línea", on_click=add_line)
 
-# --- Mostrar cada línea ---
+# -------------------------------
+# PROCESAR CADA LÍNEA
+# -------------------------------
 for idx, linea in enumerate(st.session_state.lineas):
+
     st.subheader(f"Línea {idx + 1}")
 
     col1, col2 = st.columns([3, 1])
@@ -57,36 +69,48 @@ for idx, linea in enumerate(st.session_state.lineas):
         deducible_btn = st.checkbox("Deducibilidad 8.5%", key=f"ded_{idx}")
         linea["deducible"] = deducible_btn
 
-    # --- Buscar en el Excel ---
+    # Si hay UUID ingresado
     if uuid_val:
+
+        # Filtrar por UUID
+        if "UUID" not in df.columns:
+            st.error("El archivo no contiene la columna 'UUID'.")
+            continue
+
         row = df[df["UUID"] == uuid_val]
 
         if row.empty:
-            st.warning("UUID no encontrado en la base.")
-        else:
-            factura = row.iloc[0]
+            st.error("El UUID no existe en el archivo.")
+            continue
 
-            fecha = factura["Fecha"]
-            subtotal = factura["Subtotal"]
-            iva = factura["IVA"]
-            isr = factura["ISR"]
-            ret = factura["Retenciones"]
-            desc = factura["Descuentos"]
-            total = factura["Total"]
-            concepto = factura["Concepto"]
+        factura = row.iloc[0]
 
-            # --- Cálculo deducible ---
-            deducible = total * 0.085 if deducible_btn else 0
+        # -------------------------------
+        # DESPLIEGUE DE CAMPOS
+        # -------------------------------
+        st.write("### Datos de la factura")
 
-            st.write("### Datos de la factura")
-            st.write(f"**Fecha:** {fecha}")
-            st.write(f"**Subtotal:** {subtotal:,.2f}")
-            st.write(f"**IVA:** {iva:,.2f}")
-            st.write(f"**ISR:** {isr:,.2f}")
-            st.write(f"**Retenciones:** {ret:,.2f}")
-            st.write(f"**Descuentos:** {desc:,.2f}")
-            st.write(f"**Total:** {total:,.2f}")
-            st.write(f"**Concepto:** {concepto}")
+        def mostrar(campo, nombre):
+            if campo in df.columns:
+                st.write(f"**{nombre}:** {factura[campo]}")
+            else:
+                st.write(f"**{nombre}:** (columna no encontrada)")
 
-            if deducible_btn:
+        mostrar("Emisión", "Fecha")
+        mostrar("SubTotal", "Subtotal")
+        mostrar("IVA", "IVA")
+        mostrar("ISR Retenido", "ISR Retenido")
+        mostrar("IVA Retenido", "Retenciones")
+        mostrar("Descuento", "Descuentos")
+        mostrar("Total", "Total")
+        mostrar("Conceptos Descripción", "Concepto")
+
+        # -------------------------------
+        # DEDUCIBILIDAD
+        # -------------------------------
+        if deducible_btn:
+            if "Total" in df.columns:
+                deducible = factura["Total"] * 0.085
                 st.success(f"Deducible (8.5%): {deducible:,.2f}")
+            else:
+                st.warning("No se encontró la columna 'Total' para calcular deducibilidad.")
