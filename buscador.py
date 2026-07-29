@@ -18,22 +18,11 @@ if uploaded_file is not None:
 
     # Detectar tipo de archivo
     if filename.endswith(".csv"):
-        df_raw = pd.read_csv(uploaded_file, encoding="utf-8", sep=",")
+        df = pd.read_csv(uploaded_file, encoding="utf-8")
     else:
-        df_raw = pd.read_excel(uploaded_file)
+        df = pd.read_excel(uploaded_file)
 
-    # Intentar detectar encabezado correcto
-    df = None
-    for h in range(5):
-        temp = pd.read_excel(uploaded_file, header=h) if filename.endswith(".xlsx") else pd.read_csv(uploaded_file, header=h)
-        if "UUID" in temp.columns:
-            df = temp
-            break
-
-    # Si no se encontró encabezado correcto
-    if df is None:
-        df = df_raw
-
+    # Mostrar columnas detectadas
     st.write("### Columnas detectadas en el archivo:")
     st.write(list(df.columns))
 
@@ -72,11 +61,12 @@ for idx, linea in enumerate(st.session_state.lineas):
     # Si hay UUID ingresado
     if uuid_val:
 
-        # Filtrar por UUID
+        # Validar que la columna exista
         if "UUID" not in df.columns:
             st.error("El archivo no contiene la columna 'UUID'.")
             continue
 
+        # Filtrar por UUID
         row = df[df["UUID"] == uuid_val]
 
         if row.empty:
@@ -90,9 +80,9 @@ for idx, linea in enumerate(st.session_state.lineas):
         # -------------------------------
         st.write("### Datos de la factura")
 
-        def mostrar(campo, nombre):
-            if campo in df.columns:
-                st.write(f"**{nombre}:** {factura[campo]}")
+        def mostrar(columna, nombre):
+            if columna in df.columns:
+                st.write(f"**{nombre}:** {factura[columna]}")
             else:
                 st.write(f"**{nombre}:** (columna no encontrada)")
 
