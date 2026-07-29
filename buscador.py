@@ -64,6 +64,17 @@ if not st.session_state.tabla.empty:
 st.markdown("---")
 
 # -------------------------------
+# FUNCIÓN PARA LIMPIAR NÚMEROS
+# -------------------------------
+def limpiar_numero(valor):
+    try:
+        if isinstance(valor, str):
+            valor = valor.replace(",", "").strip()
+        return float(valor)
+    except:
+        return 0.0
+
+# -------------------------------
 # PROCESAR CADA LÍNEA
 # -------------------------------
 for idx, linea in enumerate(st.session_state.lineas):
@@ -87,13 +98,13 @@ for idx, linea in enumerate(st.session_state.lineas):
 
         factura = row.iloc[0]
 
-        # Extraer columnas
+        # Extraer columnas y limpiar números
         emision = factura.get("Emisión", "")
-        subtotal = float(factura.get("SubTotal", 0))
-        isr = float(factura.get("ISR Retenido", 0))
-        iva_ret = float(factura.get("IVA Retenido", 0))
+        subtotal = limpiar_numero(factura.get("SubTotal", 0))
+        isr = limpiar_numero(factura.get("ISR Retenido", 0))
+        iva_ret = limpiar_numero(factura.get("IVA Retenido", 0))
         retencion = isr + iva_ret
-        total_xml = float(factura.get("Total Original XML", 0))
+        total_xml = limpiar_numero(factura.get("Total Original XML", 0))
         lugar_exp = factura.get("Emisor Lugar Expedición", "")
         concepto = factura.get("Conceptos Descripción", "")
 
